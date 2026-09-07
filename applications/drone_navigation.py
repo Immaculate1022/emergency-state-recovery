@@ -7,7 +7,9 @@ to last known good position and orientation.
 """
 
 import sys
-sys.path.insert(0, '/home/ubuntu/emergency-state-recovery')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.state_recovery import EmergencyStateRecovery
 import numpy as np
@@ -59,8 +61,8 @@ class DroneNavigationRecovery:
         return stability
     
     def _record_nav_checkpoint(self, label: str):
-        \"\"\"Record current navigation state.\"\"\"
-        state_id = f\"nav_{label}_{self.step_count}\"
+        """Record current navigation state."""
+        state_id = f"nav_{label}_{self.step_count}"
         
         stability = self._calculate_stability_metric()
         
@@ -79,13 +81,13 @@ class DroneNavigationRecovery:
         )
     
     def update_navigation(self, command: np.ndarray, sensor_noise: float = 0.01):
-        \"\"\"
+        """
         Update drone position and orientation based on command.
         
         Args:
             command: Navigation command [vx, vy, vz, roll, pitch, yaw]
             sensor_noise: Sensor noise level
-        \"\"\"
+        """
         # Apply command with noise
         self.velocity = command[:3] + np.random.randn(3) * sensor_noise
         self.orientation = command[3:6] + np.random.randn(3) * sensor_noise
@@ -111,14 +113,14 @@ class DroneNavigationRecovery:
         if not is_stable:
             self._trigger_navigation_recovery()
         elif self.step_count % 50 == 0:
-            self._record_nav_checkpoint(f\"step_{self.step_count}\")
+            self._record_nav_checkpoint(f"step_{self.step_count}")
     
     def _trigger_navigation_recovery(self):
-        \"\"\"Trigger emergency navigation recovery.\"\"\"
+        """Trigger emergency navigation recovery."""
         current_stability = self._calculate_stability_metric()
         
         target_state = self.recovery.trigger_recall(
-            reason=\"Navigation instability detected\",
+            reason="Navigation instability detected",
             diagnostics={
                 'current_stability': current_stability,
                 'position': self.position.tolist(),
@@ -132,19 +134,19 @@ class DroneNavigationRecovery:
             self.orientation = np.array(target_state.state_vector['orientation'])
             self.velocity = np.array(target_state.state_vector['velocity'])
             
-            print(f\"✓ Navigation recovered to: {target_state.state_id}\")
-            print(f\"  Restored position: {self.position}\")
-            print(f\"  Restored stability: {target_state.state_vector['stability']:.4f}\")
+            print(f"✓ Navigation recovered to: {target_state.state_id}")
+            print(f"  Restored position: {self.position}")
+            print(f"  Restored stability: {target_state.state_vector['stability']:.4f}")
     
     def simulate_mission(self, num_steps: int = 500, fog_probability: float = 0.1):
-        \"\"\"
+        """
         Simulate drone mission with environmental challenges.
         
         Args:
             num_steps: Number of navigation steps
             fog_probability: Probability of sensor fog (confusion)
-        \"\"\"
-        print(f\"Starting drone mission simulation ({num_steps} steps)...\")
+        """
+        print(f"Starting drone mission simulation ({num_steps} steps)...")
         
         for step in range(num_steps):
             # Generate navigation command
@@ -162,16 +164,16 @@ class DroneNavigationRecovery:
             if np.random.rand() < fog_probability:
                 # Sensor malfunction - incorrect readings
                 command += np.random.randn(6) * 0.5
-                print(f\"\\n⚠️  Sensor fog detected at step {step}\")
+                print(f"\n⚠️  Sensor fog detected at step {step}")
             
             self.update_navigation(command, sensor_noise=0.01)
             
             if (step + 1) % 100 == 0:
                 stability = self._calculate_stability_metric()
-                print(f\"Step {step + 1}: Position = {self.position}, Stability = {stability:.4f}, Recoveries = {len(self.recovery.recall_history)}\")
+                print(f"Step {step + 1}: Position = {self.position}, Stability = {stability:.4f}, Recoveries = {len(self.recovery.recall_history)}")
     
     def get_mission_summary(self) -> dict:
-        \"\"\"Get mission summary.\"\"\"
+        """Get mission summary."""
         final_stability = self._calculate_stability_metric()
         avg_stability = np.mean([h['stability'] for h in self.navigation_history[-100:]])
         
@@ -186,18 +188,18 @@ class DroneNavigationRecovery:
         }
 
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     drone = DroneNavigationRecovery(decay_constant=500)
     drone.simulate_mission(num_steps=500, fog_probability=0.05)
     
     summary = drone.get_mission_summary()
     
-    print(\"\\n\" + \"=\"*60)
-    print(\"DRONE MISSION SIMULATION COMPLETE\")
-    print(\"=\"*60)
-    print(f\"Total Steps: {summary['total_steps']}\")
-    print(f\"Final Position: {summary['final_position']}\")
-    print(f\"Final Stability: {summary['final_stability']:.4f}\")
-    print(f\"Average Stability: {summary['avg_stability']:.4f}\")
-    print(f\"Total Emergency Recoveries: {summary['total_recoveries']}\")
-    print(f\"Best Recorded Stability: {summary['best_stability']:.4f}\")
+    print("\n" + "="*60)
+    print("DRONE MISSION SIMULATION COMPLETE")
+    print("="*60)
+    print(f"Total Steps: {summary['total_steps']}")
+    print(f"Final Position: {summary['final_position']}")
+    print(f"Final Stability: {summary['final_stability']:.4f}")
+    print(f"Average Stability: {summary['avg_stability']:.4f}")
+    print(f"Total Emergency Recoveries: {summary['total_recoveries']}")
+    print(f"Best Recorded Stability: {summary['best_stability']:.4f}")

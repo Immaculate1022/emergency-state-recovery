@@ -9,8 +9,7 @@ import json
 import time
 import logging
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Callable
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 import math
 
 # Configure logging
@@ -67,6 +66,11 @@ class EmergencyStateRecovery:
             decay_constant: Time constant for confidence decay (steps)
             instability_threshold: Threshold for triggering recovery
         """
+        if decay_constant <= 0:
+            raise ValueError("decay_constant must be greater than zero")
+        if not 0 <= instability_threshold < 1:
+            raise ValueError("instability_threshold must be in the range [0, 1)")
+
         self.decay_constant = decay_constant
         self.instability_threshold = instability_threshold
         
@@ -95,17 +99,23 @@ class EmergencyStateRecovery:
             step_count=self.current_step,
             performance_metric=performance_metric,
             state_vector=state_vector.copy(),
-            metadata=metadata or {},
+            metadata=(metadata or {}).copy(),
             confidence_score=1.0
         )
         
         self.states[state_id] = snapshot
-        
-        # Update best state if this is better
-        if self.best_state_id is None or performance_metric > self.states[self.best_state_id].performance_metric:
-            self.best_state_id = state_id
-            logger.info(f"New best state recorded: {state_id} (performance: {performance_metric:.4f})")
-        
+
+        previous_best = self.best_state_id
+        self.best_state_id = max(
+            self.states,
+            key=lambda candidate_id: self.states[candidate_id].performance_metric,
+        )
+        if self.best_state_id != previous_best:
+            logger.info(
+                f"New best state recorded: {self.best_state_id} "
+                f"(performance: {self.states[self.best_state_id].performance_metric:.4f})"
+            )
+
         self.current_step += 1
         return snapshot
     
@@ -247,22 +257,37 @@ class EmergencyStateRecovery:
             'recall_history': [asdict(event) for event in self.recall_history]
         }
         
-        with open(filepath, 'w') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, default=str)
         
         logger.info(f"States exported to {filepath}")
     
     def import_states(self, filepath: str):
         """Import states from JSON file."""
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        self.best_state_id = data.get('best_state_id')
+        self.states = {
+            state_id: StateSnapshot.from_dict(state_data)
+            for state_id, state_data in data.get('states', {}).items()
+        }
         self.current_step = data.get('current_step', 0)
-        
-        for state_id, state_data in data.get('states', {}).items():
-            self.states[state_id] = StateSnapshot.from_dict(state_data)
-        
+        self.recall_history = [
+            RecallEvent(**event_data)
+            for event_data in data.get('recall_history', [])
+        ]
+
+        requested_best = data.get('best_state_id')
+        if requested_best in self.states:
+            self.best_state_id = requested_best
+        elif self.states:
+            self.best_state_id = max(
+                self.states,
+                key=lambda state_id: self.states[state_id].performance_metric,
+            )
+        else:
+            self.best_state_id = None
+
         logger.info(f"States imported from {filepath}")
 
 

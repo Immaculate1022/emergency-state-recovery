@@ -7,7 +7,9 @@ rebalances when strategy destabilizes.
 """
 
 import sys
-sys.path.insert(0, '/home/ubuntu/emergency-state-recovery')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core.state_recovery import EmergencyStateRecovery, StateSnapshot
 import numpy as np
